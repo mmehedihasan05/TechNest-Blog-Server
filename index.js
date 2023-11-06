@@ -42,8 +42,9 @@ async function mainProcess() {
         console.log("Pinged your deployment. You successfully connected to MongoDB!");
 
         const allBlogs = client.db("a11-technest").collection("blogs");
+        const editorsPick = client.db("a11-technest").collection("editors-pick");
 
-        // Brand Wise Products Data Fetch
+        // Brand Wise blog Data Fetch
         // open api
         // sort and return
         app.get("/recent-blogs", async (req, res) => {
@@ -56,6 +57,27 @@ async function mainProcess() {
             const recentBlogs = await cursor.toArray();
 
             res.send(recentBlogs);
+        });
+
+        // Editors pick blog data fetch
+        // open api
+        app.get("/editors-pick", async (req, res) => {
+            // console.log("request method ", req.method);
+
+            const query = {}; // fetching all data, thats's why no query
+            const cursor = editorsPick.find(query);
+            const editorsPick_ids_raw = await cursor.toArray();
+
+            // As the data return in array of object, taken only post_ids array.
+            const editorsPick_postId = editorsPick_ids_raw[0].editorsPick_postId;
+
+            // converted blog_id to ObjectId for find
+            const idsToFind = editorsPick_postId.map((blogId) => new ObjectId(blogId));
+
+            // fetching editors choice blogs from all blogs
+            const editorsPick_blogs = await allBlogs.find({ _id: { $in: idsToFind } }).toArray();
+
+            res.send(editorsPick_blogs);
         });
     } finally {
         // await client.close();
