@@ -50,14 +50,46 @@ async function mainProcess() {
         // sort and return
         app.get("/recent-blogs", async (req, res) => {
             // console.log("request method ", req.method);
-            console.log("Recent Blogs called");
+
+            // fetching recent blogs
             const query = {};
             const cursor = allBlogs.find(query);
             cursor.sort({ creationTime: -1 });
             cursor.limit(6);
             const recentBlogs = await cursor.toArray();
 
-            res.send(recentBlogs);
+            // adding wishlist data to blogs
+
+            // getting wishlist data
+            const userId = req.query.userid;
+
+            // if user logged in there must be userId, so it need to check
+            // but if ther user not logged in there will be no user id, so its no need to check wishlist
+            if (userId == "undefined") {
+                res.send(recentBlogs);
+            } else {
+                const wishlistQuery = { userId: userId };
+                const wishListData = await wishlist.findOne(wishlistQuery);
+                const wishLists = wishListData.wishLists;
+
+                let updatedRecentBlogs = [];
+
+                recentBlogs.map((blogData) => {
+                    wishLists.forEach((wishlistBlogId) => {
+                        if (blogData._id.equals(wishlistBlogId)) {
+                            blogData.wishlist = true;
+                        }
+                    });
+
+                    if (!blogData.wishlist) {
+                        blogData.wishlist = false;
+                    }
+
+                    updatedRecentBlogs.push(blogData);
+                });
+
+                res.send(updatedRecentBlogs);
+            }
         });
 
         // Editors pick blog data fetch
