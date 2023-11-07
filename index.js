@@ -43,13 +43,14 @@ async function mainProcess() {
 
         const allBlogs = client.db("a11-technest").collection("blogs");
         const editorsPick = client.db("a11-technest").collection("editors-pick");
+        const wishlist = client.db("a11-technest").collection("wishlist");
 
         // Brand Wise blog Data Fetch
         // open api
         // sort and return
         app.get("/recent-blogs", async (req, res) => {
             // console.log("request method ", req.method);
-
+            console.log("Recent Blogs called");
             const query = {};
             const cursor = allBlogs.find(query);
             cursor.sort({ creationTime: -1 });
@@ -79,7 +80,122 @@ async function mainProcess() {
 
             res.send(editorsPick_blogs);
         });
+
+        // Single Blog Data Fetch
+        // open api
+        app.get("/blogDetails/:blog_id", async (req, res) => {
+            // getting blog details
+            const blog_id = req.params.blog_id;
+            const blogDetailsQuery = { _id: new ObjectId(blog_id) };
+            const blogData = await allBlogs.findOne(blogDetailsQuery);
+
+            // getting wishlist data
+            const userId = req.query.userid;
+
+            // if user logged in there must be userId, so it need to check
+            // but if ther user not logged in there will be no user id, so its no need to check wishlist
+            if (userId == "undefined") {
+                res.send(blogData);
+            } else {
+                const wishlistQuery = { userId: userId };
+                const wishListData = await wishlist.findOne(wishlistQuery);
+                const wishLists = wishListData.wishLists;
+
+                wishLists.forEach((wishlistBlogId) => {
+                    if (blogData._id.equals(wishlistBlogId)) {
+                        blogData.wishlist = true;
+                    }
+                });
+
+                if (!blogData.wishlist) {
+                    blogData.wishlist = false;
+                }
+
+                res.send(blogData);
+            }
+        });
+
+        // Wishlist add.
+        // protected api.
+        app.patch("/addWishlist", async (req, res) => {
+            const blogId = req.body.blogId;
+            const userId = req.body.userId;
+
+            const query = { userId: userId };
+
+            const wishListData = await wishlist.findOne(query);
+
+            console.log(wishListData);
+
+            //  as userId is not added in db, theres no data in it
+            if (!wishListData) {
+                console.log("new user");
+                let newWishListData = {
+                    userId: userId,
+                    wishLists: [blogId],
+                };
+
+                const insertResult = await wishlist.insertOne(newWishListData);
+
+                console.log(insertResult);
+
+                return res.send(insertResult);
+            }
+
+            const tempWishLists = wishListData.wishLists;
+
+            // Add blogId to wishlists
+            tempWishLists.push(blogId);
+
+            // written condition
+            const updatedWishlists = {
+                $set: {
+                    wishLists: tempWishLists,
+                },
+            };
+
+            const options = { upsert: false };
+
+            // updating data
+            const result = await wishlist.updateOne(query, updatedWishlists, options);
+
+            console.log(result);
+
+            return res.send(result);
+        });
+
+        // Wishlist remove.
+        // protected api.
+        app.patch("/removeWishlist", async (req, res) => {
+            const blogId = req.body.blogId;
+            const userId = req.body.userId;
+
+            const wishlistQuery = { userId: userId };
+
+            const wishListData = await wishlist.findOne(wishlistQuery);
+            console.log(wishListData);
+
+            return;
+            const wishLists = wishListData.wishLists;
+            // Remove blog id from tempWishLists
+            let filteredWishlist = wishLists.filter((id) => id !== blogId);
+
+            // written condition
+            const updatedWishlists = {
+                $set: {
+                    wishLists: filteredWishlist,
+                },
+            };
+
+            const options = { upsert: false };
+
+            // updating data
+            const result = await wishlist.updateOne(wishlistQuery, updatedWishlists, options);
+
+            return res.send(result);
+        });
     } finally {
+        // /blogDetails/:blog_id
         // await client.close();
     }
 }
