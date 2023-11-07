@@ -177,6 +177,41 @@ async function mainProcess() {
             }
         });
 
+        app.post("/addBlog", async (req, res) => {
+            console.log(req.body);
+
+            /*
+                        bannerUrl,
+        title,
+        category,
+        shortDescription,
+        longDescription,
+
+        authorInfo: { name: authorName, imageUrl: authorImage, userId: authorUserId },
+            */
+            const blogData = req.body;
+
+            // const blogInformations = {
+            //     bannerUrl: blogData?.bannerUrl,
+            //     title: blogData?.title,
+            //     category: blogData?.category,
+            //     shortDescription: blogData?.shortDescription,
+            //     longDescription: blogData?.longDescription,
+            //     creationTime: blogData?.creationTime,
+            //     authorInfo: {
+            //         name: blogData.authorInfo?.name,
+            //         imageUrl: blogData.authorInfo?.imageUrl,
+            //         userId: blogData.authorInfo?.userId,
+            //     },
+            // };
+
+            // console.log(blogData, blogInformations);
+
+            const result = await allBlogs.insertOne(blogData);
+
+            res.send(result);
+        });
+
         // Wishlist add.
         // protected api.
         app.patch("/addWishlist", async (req, res) => {
