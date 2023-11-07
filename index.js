@@ -173,9 +173,7 @@ async function mainProcess() {
             const wishlistQuery = { userId: userId };
 
             const wishListData = await wishlist.findOne(wishlistQuery);
-            console.log(wishListData);
 
-            return;
             const wishLists = wishListData.wishLists;
             // Remove blog id from tempWishLists
             let filteredWishlist = wishLists.filter((id) => id !== blogId);
