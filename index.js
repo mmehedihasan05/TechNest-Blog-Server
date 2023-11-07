@@ -95,8 +95,6 @@ async function mainProcess() {
         // Editors pick blog data fetch
         // open api
         app.get("/editors-pick", async (req, res) => {
-            // console.log("request method ", req.method);
-
             const query = {}; // fetching all data, thats's why no query
             const cursor = editorsPick.find(query);
             const editorsPick_ids_raw = await cursor.toArray();
@@ -110,7 +108,39 @@ async function mainProcess() {
             // fetching editors choice blogs from all blogs
             const editorsPick_blogs = await allBlogs.find({ _id: { $in: idsToFind } }).toArray();
 
-            res.send(editorsPick_blogs);
+            // adding wishlist data to blogs
+            const userId = req.query.userid;
+
+            // getting wishlist data
+            // if user logged in there must be userId, so it need to check
+            // but if ther user not logged in there will be no user id, so its no need to check wishlist
+            if (userId == "undefined") {
+                res.send(editorsPick_blogs);
+            } else {
+                const wishlistQuery = { userId: userId };
+                const wishListData = await wishlist.findOne(wishlistQuery);
+                const wishLists = wishListData.wishLists;
+
+                console.log(wishLists);
+                let updatedEditorsPickBlogs = [];
+
+                editorsPick_blogs.map((blogData) => {
+                    wishLists.forEach((wishlistBlogId) => {
+                        if (blogData._id.equals(wishlistBlogId)) {
+                            blogData.wishlist = true;
+                        }
+                    });
+
+                    if (!blogData.wishlist) {
+                        blogData.wishlist = false;
+                    }
+
+                    updatedEditorsPickBlogs.push(blogData);
+                });
+
+                console.log(updatedEditorsPickBlogs);
+                res.send(updatedEditorsPickBlogs);
+            }
         });
 
         // Single Blog Data Fetch
