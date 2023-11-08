@@ -45,12 +45,65 @@ async function mainProcess() {
         const editorsPick = client.db("a11-technest").collection("editors-pick");
         const wishlist = client.db("a11-technest").collection("wishlist");
 
-        // Brand Wise blog Data Fetch
+        app.get("/allblogs_temp", async (req, res) => {
+            // fetching recent blogs
+            const query = {};
+            const cursor = allBlogs.find(query);
+            const allBlogsList = await cursor.toArray();
+
+            res.send(allBlogsList);
+        });
+
+        // all blog Data Fetch
+        // open api
+        // sort and return
+        app.get("/allblogs", async (req, res) => {
+            // fetching recent blogs
+            const query = {};
+            const cursor = allBlogs.find(query);
+            cursor.sort({ creationTime: -1 });
+            const allBlogsList = await cursor.toArray();
+
+            // adding wishlist data to blogs
+            // getting wishlist data
+            const userId = req.query.userid;
+
+            // if user logged in there must be userId, so it need to check
+            // but if ther user not logged in there will be no user id, so its no need to check wishlist
+            if (userId == "undefined" || userId == "null") {
+                res.send(allBlogsList);
+            } else {
+                const wishlistQuery = { userId: userId };
+                const wishListData = await wishlist.findOne(wishlistQuery);
+
+                if (!wishListData) return res.send(allBlogsList);
+
+                const wishLists = wishListData.wishLists;
+
+                let updatedAllBlogsList = [];
+
+                allBlogsList.forEach((blogData) => {
+                    wishLists.forEach((wishlistBlogId) => {
+                        if (blogData._id.equals(wishlistBlogId)) {
+                            blogData.wishlist = true;
+                        }
+                    });
+
+                    if (!blogData.wishlist) {
+                        blogData.wishlist = false;
+                    }
+
+                    updatedAllBlogsList.push(blogData);
+                });
+
+                res.send(updatedAllBlogsList);
+            }
+        });
+
+        // recent blog Data Fetch
         // open api
         // sort and return
         app.get("/recent-blogs", async (req, res) => {
-            // console.log("request method ", req.method);
-
             // fetching recent blogs
             const query = {};
             const cursor = allBlogs.find(query);
@@ -65,16 +118,19 @@ async function mainProcess() {
 
             // if user logged in there must be userId, so it need to check
             // but if ther user not logged in there will be no user id, so its no need to check wishlist
-            if (userId == "undefined") {
+            if (userId == "undefined" || userId == "null") {
                 res.send(recentBlogs);
             } else {
                 const wishlistQuery = { userId: userId };
                 const wishListData = await wishlist.findOne(wishlistQuery);
+
+                if (!wishListData) return res.send(recentBlogs);
+
                 const wishLists = wishListData.wishLists;
 
                 let updatedRecentBlogs = [];
 
-                recentBlogs.map((blogData) => {
+                recentBlogs.forEach((blogData) => {
                     wishLists.forEach((wishlistBlogId) => {
                         if (blogData._id.equals(wishlistBlogId)) {
                             blogData.wishlist = true;
@@ -114,17 +170,19 @@ async function mainProcess() {
             // getting wishlist data
             // if user logged in there must be userId, so it need to check
             // but if ther user not logged in there will be no user id, so its no need to check wishlist
-            if (userId == "undefined") {
+            if (userId == "undefined" || userId == "null") {
                 res.send(editorsPick_blogs);
             } else {
                 const wishlistQuery = { userId: userId };
                 const wishListData = await wishlist.findOne(wishlistQuery);
+
+                if (!wishListData) return res.send(editorsPick_blogs);
+
                 const wishLists = wishListData.wishLists;
 
-                console.log(wishLists);
                 let updatedEditorsPickBlogs = [];
 
-                editorsPick_blogs.map((blogData) => {
+                editorsPick_blogs.forEach((blogData) => {
                     wishLists.forEach((wishlistBlogId) => {
                         if (blogData._id.equals(wishlistBlogId)) {
                             blogData.wishlist = true;
@@ -138,7 +196,6 @@ async function mainProcess() {
                     updatedEditorsPickBlogs.push(blogData);
                 });
 
-                console.log(updatedEditorsPickBlogs);
                 res.send(updatedEditorsPickBlogs);
             }
         });
@@ -156,11 +213,14 @@ async function mainProcess() {
 
             // if user logged in there must be userId, so it need to check
             // but if ther user not logged in there will be no user id, so its no need to check wishlist
-            if (userId == "undefined") {
+            if (userId == "undefined" || userId == "null") {
                 res.send(blogData);
             } else {
                 const wishlistQuery = { userId: userId };
                 const wishListData = await wishlist.findOne(wishlistQuery);
+
+                if (!wishListData) return res.send(blogData);
+
                 const wishLists = wishListData.wishLists;
 
                 wishLists.forEach((wishlistBlogId) => {
@@ -193,12 +253,8 @@ async function mainProcess() {
             const blog_id = req.params.blog_id;
             const blogData = req.body;
 
-            // const result = await allBlogs.insertOne(blogData);
-
             const query = { _id: new ObjectId(blog_id) };
             const options = { upsert: false };
-
-            console.log(blogData);
 
             const updatedData = {
                 $set: {
@@ -225,19 +281,14 @@ async function mainProcess() {
 
             const wishListData = await wishlist.findOne(query);
 
-            console.log(wishListData);
-
             //  as userId is not added in db, theres no data in it
             if (!wishListData) {
-                console.log("new user");
                 let newWishListData = {
                     userId: userId,
                     wishLists: [blogId],
                 };
 
                 const insertResult = await wishlist.insertOne(newWishListData);
-
-                console.log(insertResult);
 
                 return res.send(insertResult);
             }
@@ -258,8 +309,6 @@ async function mainProcess() {
 
             // updating data
             const result = await wishlist.updateOne(query, updatedWishlists, options);
-
-            console.log(result);
 
             return res.send(result);
         });
