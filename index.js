@@ -177,37 +177,40 @@ async function mainProcess() {
             }
         });
 
+        // Post blog to db
+        // Protected Api
         app.post("/addBlog", async (req, res) => {
-            console.log(req.body);
-
-            /*
-                        bannerUrl,
-        title,
-        category,
-        shortDescription,
-        longDescription,
-
-        authorInfo: { name: authorName, imageUrl: authorImage, userId: authorUserId },
-            */
             const blogData = req.body;
 
-            // const blogInformations = {
-            //     bannerUrl: blogData?.bannerUrl,
-            //     title: blogData?.title,
-            //     category: blogData?.category,
-            //     shortDescription: blogData?.shortDescription,
-            //     longDescription: blogData?.longDescription,
-            //     creationTime: blogData?.creationTime,
-            //     authorInfo: {
-            //         name: blogData.authorInfo?.name,
-            //         imageUrl: blogData.authorInfo?.imageUrl,
-            //         userId: blogData.authorInfo?.userId,
-            //     },
-            // };
-
-            // console.log(blogData, blogInformations);
-
             const result = await allBlogs.insertOne(blogData);
+
+            res.send(result);
+        });
+
+        // Update blog
+        // Protected Api
+        app.put("/updateBlog/:blog_id", async (req, res) => {
+            const blog_id = req.params.blog_id;
+            const blogData = req.body;
+
+            // const result = await allBlogs.insertOne(blogData);
+
+            const query = { _id: new ObjectId(blog_id) };
+            const options = { upsert: false };
+
+            console.log(blogData);
+
+            const updatedData = {
+                $set: {
+                    bannerUrl: blogData.bannerUrl,
+                    title: blogData.title,
+                    category: blogData.category,
+                    shortDescription: blogData.shortDescription,
+                    longDescription: blogData.longDescription,
+                },
+            };
+
+            const result = await allBlogs.updateOne(query, updatedData, options);
 
             res.send(result);
         });
