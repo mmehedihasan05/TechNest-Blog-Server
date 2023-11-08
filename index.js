@@ -261,6 +261,35 @@ async function mainProcess() {
             }
         });
 
+        // Wishlist blog data fetch
+        // open api
+        app.get("/wishlist", async (req, res) => {
+            const userId = req.query.userid;
+            const wishlistQuery = { userId: userId };
+            const wishListData = await wishlist.findOne(wishlistQuery);
+
+            if (!wishListData) return res.send([]);
+
+            const wishLists = wishListData.wishLists;
+
+            if (wishLists.length === 0) return res.send([]);
+
+            console.log(wishLists);
+
+            // converted blog_id to ObjectId for find
+            const idsToFind = wishLists.map((blogId) => new ObjectId(blogId));
+
+            // fetching wishlist blogs from all blogs
+            let wishlist_blogs = await allBlogs.find({ _id: { $in: idsToFind } }).toArray();
+
+            wishlist_blogs = wishlist_blogs.map((wishlistBlog) => {
+                wishlistBlog.wishlist = true;
+                return wishlistBlog;
+            });
+
+            res.send(wishlist_blogs);
+        });
+
         // Single Blog Data Fetch
         // open api
         app.get("/blogDetails/:blog_id", async (req, res) => {
