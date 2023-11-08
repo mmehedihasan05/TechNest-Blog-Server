@@ -262,7 +262,7 @@ async function mainProcess() {
         });
 
         // Wishlist blog data fetch
-        // open api
+        // Protected api
         app.get("/wishlist", async (req, res) => {
             const userId = req.query.userid;
             const wishlistQuery = { userId: userId };
@@ -288,6 +288,29 @@ async function mainProcess() {
             });
 
             res.send(wishlist_blogs);
+        });
+
+        // Featured List Data Fetch
+        // open api
+        app.get("/featured-blogs", async (req, res) => {
+            // fetching recent blogs
+            const query = {};
+            const cursor = allBlogs.find(query);
+            const allBlogsList = await cursor.toArray();
+
+            let largestBlogs = allBlogsList.sort((b, a) => {
+                if (a.longDescription.length < b.longDescription.length) {
+                    return -1;
+                }
+                if (a.longDescription.length > b.longDescription.length) {
+                    return 1;
+                }
+                return 0;
+            });
+
+            let topTenBlog = largestBlogs.slice(0, 10);
+
+            res.send(topTenBlog);
         });
 
         // Single Blog Data Fetch
