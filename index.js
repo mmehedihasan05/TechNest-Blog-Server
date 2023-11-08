@@ -12,7 +12,13 @@ const port = process.env.PORT || 5000;
 
 app.use(
     cors({
-        origin: ["http://localhost:5173", "http://localhost:5100"], // The domains where the client side will run
+        origin: [
+            "http://localhost:5173",
+            "http://localhost:5100",
+            "https://a11-technest.web.app",
+            "https://a11-technest.firebaseapp.com",
+        ], // The domains where the client side will run
+
         credentials: true, // This will help to set cookies
     })
 );
@@ -64,6 +70,61 @@ async function mainProcess() {
             cursor.sort({ creationTime: -1 });
             const allBlogsList = await cursor.toArray();
 
+            // adding wishlist data to blogs
+            // getting wishlist data
+            const userId = req.query.userid;
+
+            // if user logged in there must be userId, so it need to check
+            // but if ther user not logged in there will be no user id, so its no need to check wishlist
+            if (userId == "undefined" || userId == "null") {
+                res.send(allBlogsList);
+            } else {
+                const wishlistQuery = { userId: userId };
+                const wishListData = await wishlist.findOne(wishlistQuery);
+
+                if (!wishListData) return res.send(allBlogsList);
+
+                const wishLists = wishListData.wishLists;
+
+                let updatedAllBlogsList = [];
+
+                allBlogsList.forEach((blogData) => {
+                    wishLists.forEach((wishlistBlogId) => {
+                        if (blogData._id.equals(wishlistBlogId)) {
+                            blogData.wishlist = true;
+                        }
+                    });
+
+                    if (!blogData.wishlist) {
+                        blogData.wishlist = false;
+                    }
+
+                    updatedAllBlogsList.push(blogData);
+                });
+
+                res.send(updatedAllBlogsList);
+            }
+        });
+
+        // search blogs by title and category
+        // open api
+        app.get("/filterblogs", async (req, res) => {
+            const searchTitle = req.query.searchTitle;
+            let searchCategory = req.query.category;
+
+            let query = {};
+
+            if (searchTitle) {
+                query.title = { $regex: searchTitle, $options: "i" };
+            }
+
+            if (searchCategory && searchCategory !== "all") {
+                query.category = searchCategory;
+            }
+
+            const allBlogsList = await allBlogs.find(query).sort({ creationTime: -1 }).toArray();
+
+            // fetching recent blogs
             // adding wishlist data to blogs
             // getting wishlist data
             const userId = req.query.userid;
@@ -342,7 +403,6 @@ async function mainProcess() {
             return res.send(result);
         });
     } finally {
-        // /blogDetails/:blog_id
         // await client.close();
     }
 }
@@ -351,7 +411,7 @@ async function mainProcess() {
 mainProcess().catch(console.dir);
 
 app.get("/", (req, res) => {
-    res.send("Food and Beverage Server Running");
+    res.send("Technest Server Running");
 });
 
 app.listen(port, () => {
