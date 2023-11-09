@@ -42,10 +42,29 @@ const client = new MongoClient(uri, {
     },
 });
 
+function extractuserEmail(req, method) {
+    if (method === "GET" || method === "DELETE") {
+        return req.query.email || "";
+    } else if (method === "POST" || method === "PUT" || method === "PATCH") {
+        return req.body.email || "";
+    } else {
+        return "";
+    }
+}
+
+function extractuserId(req, method) {
+    if (method === "GET" || method === "DELETE") {
+        return req.query.userId || "";
+    } else if (method === "POST" || method === "PUT" || method === "PATCH") {
+        return req.body.userId || "";
+    } else {
+        return "";
+    }
+}
+
 // middlewares
 const verifyToken = async (req, res, next) => {
     const token = req.cookies?.token;
-    console.log("tokeeen ", token);
 
     if (!token) {
         return res.status(401).send({ message: "unauthorized" });
@@ -58,7 +77,6 @@ const verifyToken = async (req, res, next) => {
             return res.status(401).send({ message: "unauthorized" });
         }
 
-        console.log("decoded ", decoded);
         req.user = decoded;
 
         // if its valid it will be decoded
@@ -67,62 +85,30 @@ const verifyToken = async (req, res, next) => {
 };
 
 const requestValidate = async (req, res, next) => {
-    console.log("requestvalidate");
     const method = req.method;
 
     let decoded_Email = req.user?.userEmail;
     let decoded_UserId = req.user?.userId;
 
-    const userEmail =
-        method === "GET" || method === "DELETE"
-            ? req.query.email
-            : method === "POST" || method === "PUT" || method === "PATCH"
-            ? req.body.email
-            : "";
+    const userEmail = extractuserEmail(req, method);
 
-    const userId =
-        method === "GET" || method === "DELETE"
-            ? req.query.userId
-            : method === "POST" || method === "PUT" || method === "PATCH"
-            ? req.body.userId
-            : "";
+    const userId = extractuserId(req, method);
 
     const requestedUrl = req.originalUrl;
-    console.log({
-        method,
-        requestedUrl,
-        decoded: { decoded_Email, decoded_UserId },
-        url: { userEmail, userId },
-    });
+    // console.log({
+    //     method,
+    //     requestedUrl,
+    //     decoded: { decoded_Email, decoded_UserId },
+    //     url: { userEmail, userId },
+    // });
 
     if (decoded_Email !== userEmail && decoded_UserId !== userId) {
         return res.status(401).send({ message: "unauthorized" });
     }
 
-    console.log(200, "Authorized successfully.");
+    // console.log(200, "Authorized successfully.");
     next();
 };
-
-const validateRequestWithToken = async (req, res, next) => {};
-
-function extractuserEmail(req, method) {
-    if (method === "GET" || method === "DELETE") {
-        return req.query.email || "";
-    } else if (method === "POST" || method === "PUT" || method === "PATCH") {
-        return req.body.email || "";
-    } else {
-        return "";
-    }
-}
-function extractuserId(req, method) {
-    if (method === "GET" || method === "DELETE") {
-        return req.query.userId || "";
-    } else if (method === "POST" || method === "PUT" || method === "PATCH") {
-        return req.body.userId || "";
-    } else {
-        return "";
-    }
-}
 
 // validate the token with query info. If matched calls to
 const validateAndWishlistData = async (req, res, next) => {
@@ -136,7 +122,7 @@ const validateAndWishlistData = async (req, res, next) => {
     const token = req.cookies?.token;
     req.user = null;
 
-    console.log("tokeeen ", token);
+    // console.log("tokeeen ", token);
 
     if (token) {
         jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
@@ -167,19 +153,32 @@ async function mainProcess() {
             const userEmail = req.body.email;
             const userId = req.body.userId;
 
-            console.log("from authenticate body email ", { userEmail, userId });
+            // console.log("from authenticate body email ", { userEmail, userId });
 
             const token = jwt.sign({ userEmail, userId }, process.env.ACCESS_TOKEN_SECRET, {
-                expiresIn: "1000h",
+                expiresIn: "24h",
             });
 
-            const cookieOptions = {
+            // For localhost
+            const cookieOptionsLocal = {
                 httpOnly: true, // jehetu localhost tai http only
                 secure: false, // localhost tai secure false
                 sameSite: false, // localhost and server er port different tai none
             };
 
-            res.cookie("token", token, cookieOptions);
+            const cookieOptionsProd = {
+                httpOnly: true,
+                secure: true,
+                sameSite: "none",
+                maxAge: 24 * 60 * 60 * 1000,
+            };
+            // const cookieOptionsProd = {
+            //     httpOnly: true,
+            //     secure: process.env.NODE_ENV === "production",
+            //     sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+            // };
+
+            res.cookie("token", token, cookieOptionsProd);
 
             res.send({ success: true });
         });
@@ -206,7 +205,7 @@ async function mainProcess() {
         app.get("/allblogs", validateAndWishlistData, async (req, res) => {
             // For testing purpose
 
-            console.log("=== from open api ===", req.user);
+            // console.log("=== from open api ===", req.user);
 
             // fetching recent blogs
             const query = {};
@@ -228,7 +227,7 @@ async function mainProcess() {
                     return res.send(allBlogsList);
                 } else {
                     const wishLists = wishListData.wishLists;
-                    console.log("wishLists", wishLists);
+                    // console.log("wishLists", wishLists);
 
                     // Now wishlists data will merge with the blogs data
                     let updatedAllBlogsList = [];
@@ -247,11 +246,9 @@ async function mainProcess() {
                         updatedAllBlogsList.push(blogData);
                     });
 
-                    console.log("== Before updatedAllBlogsList res send ==");
                     return res.send(updatedAllBlogsList);
                 }
             } else {
-                console.log("== Reached to last ==");
                 return res.send(allBlogsList);
             }
         });
@@ -284,11 +281,9 @@ async function mainProcess() {
 
                 // No wishlist data available for that user, thats why its null
                 if (!wishListData) {
-                    console.log("No wishlist data available");
                     return res.send(allBlogsList);
                 } else {
                     const wishLists = wishListData.wishLists;
-                    console.log("wishLists", wishLists);
 
                     // Now wishlists data will merge with the blogs data
                     let updatedAllBlogsList = [];
@@ -307,11 +302,9 @@ async function mainProcess() {
                         updatedAllBlogsList.push(blogData);
                     });
 
-                    console.log("== Before updatedAllBlogsList res send ==");
                     return res.send(updatedAllBlogsList);
                 }
             } else {
-                console.log("== Reached to last ==");
                 return res.send(allBlogsList);
             }
         });
@@ -337,11 +330,9 @@ async function mainProcess() {
 
                 // No wishlist data available for that user, thats why its null
                 if (!wishListData) {
-                    console.log("No wishlist data available");
                     return res.send(allBlogsList);
                 } else {
                     const wishLists = wishListData.wishLists;
-                    console.log("wishLists", wishLists);
 
                     // Now wishlists data will merge with the blogs data
                     let updatedAllBlogsList = [];
@@ -360,11 +351,9 @@ async function mainProcess() {
                         updatedAllBlogsList.push(blogData);
                     });
 
-                    console.log("== Before updatedAllBlogsList res send ==");
                     return res.send(updatedAllBlogsList);
                 }
             } else {
-                console.log("== Reached to last ==");
                 return res.send(allBlogsList);
             }
         });
@@ -395,11 +384,9 @@ async function mainProcess() {
 
                 // No wishlist data available for that user, thats why its null
                 if (!wishListData) {
-                    console.log("No wishlist data available");
                     return res.send(allBlogsList);
                 } else {
                     const wishLists = wishListData.wishLists;
-                    console.log("wishLists", wishLists);
 
                     // Now wishlists data will merge with the blogs data
                     let updatedAllBlogsList = [];
@@ -418,11 +405,9 @@ async function mainProcess() {
                         updatedAllBlogsList.push(blogData);
                     });
 
-                    console.log("== Before updatedAllBlogsList res send ==");
                     return res.send(updatedAllBlogsList);
                 }
             } else {
-                console.log("== Reached to last ==");
                 return res.send(allBlogsList);
             }
         });
@@ -437,7 +422,6 @@ async function mainProcess() {
 
                 // No wishlist data available for that user, thats why its null
                 if (!wishListData) {
-                    console.log("No wishlist data available");
                     return res.send([]);
                 } else {
                     const wishLists = wishListData.wishLists;
@@ -524,7 +508,6 @@ async function mainProcess() {
 
                 // No wishlist data available for that user, thats why its null
                 if (!wishListData) {
-                    console.log("No wishlist data available");
                     return res.send(allBlogsList);
                 } else {
                     const wishLists = wishListData.wishLists;
@@ -545,37 +528,9 @@ async function mainProcess() {
                 blogData.wishlist = false;
                 return res.send(blogData);
             }
-
-            /* OLD DATA */
-            // getting wishlist data
-            const userId = req.query.userid;
-
-            // if user logged in there must be userId, so it need to check
-            // but if ther user not logged in there will be no user id, so its no need to check wishlist
-            /*
-            
-            if (userId == "undefined" || userId == "null") {
-                res.send(blogData);
-            } else {
-                const wishlistQuery = { userId: userId };
-                const wishListData = await wishlist.findOne(wishlistQuery);
-                if (!wishListData) return res.send(blogData);
-                const wishLists = wishListData.wishLists;
-                wishLists.forEach((wishlistBlogId) => {
-                    if (blogData._id.equals(wishlistBlogId)) {
-                        blogData.wishlist = true;
-                    }
-                });
-
-                if (!blogData.wishlist) {
-                    blogData.wishlist = false;
-                }
-
-                res.send(blogData);
-            }
-             */
         });
 
+        // Send comments of that blog.
         app.get("/comment-list/:blog_id", async (req, res) => {
             const blog_id = req.params.blog_id;
             const query = { blog_id: blog_id };
@@ -585,7 +540,9 @@ async function mainProcess() {
             res.send(commentList);
         });
 
-        app.post("/comment", async (req, res) => {
+        // Post comments.
+        // Protected Api
+        app.post("/comment", verifyToken, requestValidate, async (req, res) => {
             const commentData = req.body;
 
             const query = { blog_id: commentData.blog_id };
@@ -626,8 +583,8 @@ async function mainProcess() {
 
         // Post blog to db
         // Protected Api
-        app.post("/addBlog", async (req, res) => {
-            const blogData = req.body;
+        app.post("/addBlog", verifyToken, requestValidate, async (req, res) => {
+            const blogData = req.body.blogData;
 
             const result = await allBlogs.insertOne(blogData);
 
@@ -636,9 +593,9 @@ async function mainProcess() {
 
         // Update blog
         // Protected Api
-        app.put("/updateBlog/:blog_id", async (req, res) => {
+        app.put("/updateBlog/:blog_id", verifyToken, requestValidate, async (req, res) => {
             const blog_id = req.params.blog_id;
-            const blogData = req.body;
+            const blogData = req.body.blogData;
 
             const query = { _id: new ObjectId(blog_id) };
             const options = { upsert: false };
@@ -660,7 +617,7 @@ async function mainProcess() {
 
         // Wishlist add.
         // protected api.
-        app.patch("/addWishlist", async (req, res) => {
+        app.patch("/addWishlist", verifyToken, requestValidate, async (req, res) => {
             const blogId = req.body.blogId;
             const userId = req.body.userId;
 
@@ -702,7 +659,7 @@ async function mainProcess() {
 
         // Wishlist remove.
         // protected api.
-        app.patch("/removeWishlist", async (req, res) => {
+        app.patch("/removeWishlist", verifyToken, requestValidate, async (req, res) => {
             const blogId = req.body.blogId;
             const userId = req.body.userId;
 
