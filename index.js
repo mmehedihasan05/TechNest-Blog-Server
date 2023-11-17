@@ -5,7 +5,6 @@ import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import cookieParser from "cookie-parser";
 dotenv.config();
-import { randomBytes } from "crypto";
 
 const app = Express();
 const port = process.env.PORT || 5000;
@@ -13,11 +12,12 @@ const port = process.env.PORT || 5000;
 app.use(
     cors({
         origin: [
+            "http://localhost:5100",
             "http://localhost:5173",
             "http://localhost:5174",
-            "http://localhost:5100",
-            "https://a11-technest.web.app",
-            "https://a11-technest.firebaseapp.com",
+            "http://localhost:5175",
+            "https://technest-blog.web.app",
+            "https://technest-blog.firebaseapp.com",
         ], // The domains where the client side will run
 
         credentials: true, // This will help to set cookies
@@ -147,6 +147,7 @@ async function mainProcess() {
         const editorsPick = client.db("a11-technest").collection("editors-pick");
         const wishlist = client.db("a11-technest").collection("wishlist");
         const comments = client.db("a11-technest").collection("comments");
+        const categoryNames = client.db("a11-technest").collection("category-names");
 
         // Authenticating
         app.post("/authenticate", async (req, res) => {
@@ -166,17 +167,18 @@ async function mainProcess() {
                 sameSite: false, // localhost and server er port different tai none
             };
 
-            const cookieOptionsProd = {
-                httpOnly: true,
-                secure: true,
-                sameSite: "none",
-                maxAge: 24 * 60 * 60 * 1000,
-            };
             // const cookieOptionsProd = {
             //     httpOnly: true,
-            //     secure: process.env.NODE_ENV === "production",
-            //     sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+            //     secure: true,
+            //     sameSite: "none",
+            //     maxAge: 24 * 60 * 60 * 1000,
             // };
+            // production
+            const cookieOptionsProd = {
+                httpOnly: true,
+                secure: process.env.NODE_ENV === "production",
+                sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+            };
 
             res.cookie("token", token, cookieOptionsProd);
 
@@ -185,18 +187,14 @@ async function mainProcess() {
 
         // Logout
         app.post("/logout", async (req, res) => {
-            res.clearCookie("token", { maxAge: 0 });
+            // res.clearCookie("token", { maxAge: 0 });
+            res.clearCookie("token", {
+                maxAge: 0,
+                secure: process.env.NODE_ENV === "production" ? true : false,
+                sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+            });
 
             res.send({ success: true });
-        });
-
-        app.get("/allblogs_temp", async (req, res) => {
-            // fetching recent blogs
-            const query = {};
-            const cursor = allBlogs.find(query);
-            const allBlogsList = await cursor.toArray();
-
-            res.send(allBlogsList);
         });
 
         // all blog Data Fetch
@@ -209,6 +207,7 @@ async function mainProcess() {
 
             // fetching recent blogs
             const query = {};
+
             const cursor = allBlogs.find(query);
             cursor.sort({ creationTime: -1 });
             const allBlogsList = await cursor.toArray();
@@ -257,19 +256,35 @@ async function mainProcess() {
         // open api
         app.get("/filterblogs", validateAndWishlistData, async (req, res) => {
             const searchTitle = req.query.searchTitle;
-            let searchCategory = req.query.category;
+            let searchCategories = req.query.categories;
+            let sort_Date = req.query.sort_Date;
+            let sortTimeOrder = -1;
+
+            if (sort_Date === "descending") {
+                sortTimeOrder = -1;
+            } else if (sort_Date === "ascending") {
+                sortTimeOrder = 1;
+            }
 
             let query = {};
+            const options = {
+                sort: {
+                    creationTime: sortTimeOrder,
+                },
+            };
 
             if (searchTitle) {
                 query.title = { $regex: searchTitle, $options: "i" };
             }
 
-            if (searchCategory && searchCategory !== "all") {
-                query.category = searchCategory;
+            if (searchCategories) {
+                query.category = { $in: searchCategories.split(",") };
             }
 
-            const allBlogsList = await allBlogs.find(query).sort({ creationTime: -1 }).toArray();
+            console.log(req.query);
+            console.log(query);
+
+            const allBlogsList = await allBlogs.find(query, options).toArray();
 
             // if user logged in there must be a token and it has been verified previously
             // But if the user is not logged in, there will be no token and no data in req.user
@@ -448,26 +463,6 @@ async function mainProcess() {
             } else {
                 return res.send([]);
             }
-
-            /*
-            const userId = req.query.userid;
-            const wishlistQuery = { userId: userId };
-            const wishListData = await wishlist.findOne(wishlistQuery);
-            if (!wishListData) return res.send([]);
-            const wishLists = wishListData.wishLists;
-            if (wishLists.length === 0) return res.send([]);
-            // converted blog_id to ObjectId for find
-            const idsToFind = wishLists.map((blogId) => new ObjectId(blogId));
-            // fetching wishlist blogs from all blogs
-            let wishlist_blogs = await allBlogs.find({ _id: { $in: idsToFind } }).toArray();
-            wishlist_blogs = wishlist_blogs.map((wishlistBlog) => {
-                wishlistBlog.wishlist = true;
-                return wishlistBlog;
-            });
-
-            res.send(wishlist_blogs);
-            
-            */
         });
 
         // Featured List Data Fetch
@@ -508,7 +503,8 @@ async function mainProcess() {
 
                 // No wishlist data available for that user, thats why its null
                 if (!wishListData) {
-                    return res.send(allBlogsList);
+                    blogData.wishlist = false;
+                    return res.send(blogData);
                 } else {
                     const wishLists = wishListData.wishLists;
 
@@ -538,6 +534,19 @@ async function mainProcess() {
             const commentList = await comments.findOne(query);
 
             res.send(commentList);
+        });
+
+        // Open api
+        // name of the categories
+        app.get("/category-names", async (req, res) => {
+            const query = { collection: "categoryNames" };
+            const categoryCollection = await categoryNames.findOne(query);
+            // const editorsPick_ids_raw = await cursor.toArray();
+
+            let categoryListObj = categoryCollection.categoryList;
+
+            console.log(categoryListObj);
+            res.send(categoryListObj);
         });
 
         // Post comments.

@@ -1,23 +1,23 @@
 {
-  "name": "a11-technest-backend",
-  "version": "1.0.0",
-  "description": "Assignment 11 TechNest",
-  "main": "index.js",
-  "type": "module",
-  "scripts": {
-    "start": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "cookie-parser": "^1.4.6",
-    "cors": "^2.8.5",
-    "crypto": "^1.0.1",
-    "dotenv": "^16.3.1",
-    "express": "^4.18.2",
-    "jsonwebtoken": "^9.0.2",
-    "mongodb": "^6.2.0",
-    "nodemon": "^3.0.1"
-  }
+    "name": "technest-backend",
+    "version": "1.0.0",
+    "description": "TechNest Backend",
+    "main": "index.js",
+    "type": "module",
+    "scripts": {
+        "start": "nodemon index.js",
+        "test": "echo \"Error: no test specified\" && exit 1"
+    },
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "cookie-parser": "^1.4.6",
+        "cors": "^2.8.5",
+        "crypto": "^1.0.1",
+        "dotenv": "^16.3.1",
+        "express": "^4.18.2",
+        "jsonwebtoken": "^9.0.2",
+        "mongodb": "^6.2.0",
+        "nodemon": "^3.0.1"
+    }
 }
