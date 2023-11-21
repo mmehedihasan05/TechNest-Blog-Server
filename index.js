@@ -111,6 +111,32 @@ const requestValidate = async (req, res, next) => {
 };
 
 // validate the token with query info. If matched calls to
+const validateAndWishlistData02 = async (req, res, next) => {
+    const token = req.cookies?.token;
+    // req.user = null;
+
+    const userEmail = extractuserEmail(req, method);
+    const userId = extractuserId(req, method);
+
+    if (token) {
+        jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+            if (err) {
+                console.log("Invalid token");
+                console.log(err);
+            } else {
+                if (decoded.userEmail !== userEmail && decoded.userId !== userId) {
+                    return res.status(401).send({ message: "unauthorized" });
+                }
+
+                req.user = decoded;
+                next();
+            }
+        });
+    }
+    next();
+};
+
+// validate the token with query info. If matched calls to
 const validateAndWishlistData = async (req, res, next) => {
     /*
     Ekhane token theke info extract kora hocche.
@@ -202,15 +228,48 @@ async function mainProcess() {
         // sort and return
         app.get("/allblogs", validateAndWishlistData, async (req, res) => {
             // For testing purpose
+            console.log("All blogs requested");
 
-            // console.log("=== from open api ===", req.user);
+            // Search Data Collecting
+            const searchTitle = req.query.searchTitle;
+            let searchCategories = req.query.categories;
+            let sort_Date = req.query.sort_Date;
 
-            // fetching recent blogs
-            const query = {};
+            const sortTimeOrder =
+                sort_Date === "descending" ? -1 : sort_Date === "ascending" ? 1 : -1;
 
-            const cursor = allBlogs.find(query);
-            cursor.sort({ creationTime: -1 });
-            const allBlogsList = await cursor.toArray();
+            console.log(req.query);
+
+            let allBlogsList = [];
+            let searchedBlogs = true;
+
+            if (!searchTitle && !searchCategories) {
+                // Return all data.
+                const query = {};
+
+                const cursor = allBlogs.find(query);
+                cursor.sort({ creationTime: sortTimeOrder });
+                allBlogsList = await cursor.toArray();
+                searchedBlogs = false;
+            } else {
+                // return search data
+                let query = {};
+                const options = {
+                    sort: {
+                        creationTime: sortTimeOrder,
+                    },
+                };
+
+                if (searchTitle) {
+                    query.title = { $regex: searchTitle, $options: "i" };
+                }
+
+                if (searchCategories) {
+                    query.category = { $in: searchCategories.split(",") };
+                }
+
+                allBlogsList = await allBlogs.find(query, options).toArray();
+            }
 
             // if user logged in there must be a token and it has been verified previously
             // But if the user is not logged in, there will be no token and no data in req.user
@@ -222,7 +281,7 @@ async function mainProcess() {
 
                 // No wishlist data available for that user, thats why its null
                 if (!wishListData) {
-                    console.log("No wishlist data available");
+                    // console.log("No wishlist data available");
                     return res.send(allBlogsList);
                 } else {
                     const wishLists = wishListData.wishLists;
@@ -245,17 +304,20 @@ async function mainProcess() {
                         updatedAllBlogsList.push(blogData);
                     });
 
-                    return res.send(updatedAllBlogsList);
+                    return res.send({ searchedBlogs, allBlogs: updatedAllBlogsList });
                 }
             } else {
-                return res.send(allBlogsList);
+                return res.send({ searchedBlogs, allBlogs: allBlogsList });
             }
         });
 
         // search blogs by title and category
         // open api
         app.get("/filterblogs", validateAndWishlistData, async (req, res) => {
+            console.log(req.query);
+            return;
             const searchTitle = req.query.searchTitle;
+
             let searchCategories = req.query.categories;
             let sort_Date = req.query.sort_Date;
             let sortTimeOrder = -1;
@@ -545,7 +607,6 @@ async function mainProcess() {
 
             let categoryListObj = categoryCollection.categoryList;
 
-            console.log(categoryListObj);
             res.send(categoryListObj);
         });
 
