@@ -176,6 +176,21 @@ async function mainProcess() {
         const categoryNames = client.db("a11-technest").collection("category-names");
         const users = client.db("a11-technest").collection("users");
 
+        // Admin verify middleware
+        const verifyAdmin = async (req, res, next) => {
+            let decoded_Email = req.user?.userEmail;
+
+            const query = { email: decoded_Email };
+
+            const userInfoResult = await users.findOne(query);
+
+            if (userInfoResult.role === "admin") {
+                next();
+            } else {
+                return res.status(403).send({ message: "forbidden access" });
+            }
+        };
+
         // Authenticating
         app.post("/authenticate", async (req, res) => {
             const userEmail = req.body.email;
@@ -224,22 +239,40 @@ async function mainProcess() {
             res.send({ success: true });
         });
 
+        // return user role
+        // verification is not mandatory!
+        // admin verified not added because its checking the admin role!
+        app.get("/role-check", verifyToken, requestValidate, async (req, res) => {
+            const targetedUserEmail = req.query.email;
+            const query = { email: targetedUserEmail };
+
+            const userInfoResult = await users.findOne(query);
+
+            let adminStatus = false;
+            if (userInfoResult.role === "admin") {
+                adminStatus = true;
+            }
+
+            res.send({ isAdmin: adminStatus });
+        });
+
+        // Admin request
         // return all users
-        app.get("/allUsers", async (req, res) => {
+        // Admin Verification required
+        app.get("/allUsers", verifyToken, requestValidate, verifyAdmin, async (req, res) => {
             const query = {};
 
             const allUsers = await users.find(query).toArray();
 
-            console.log(allUsers);
             res.send(allUsers);
         });
 
+        // Eta kivabe secure korbo bujhtesi na.
+        // user register, google/github login hole etay request ashe.
         // Users insertion
-        app.post("/user", async (req, res) => {
+        app.post("/adduser", async (req, res) => {
             const userInfo = req.body?.userInfo;
-            userInfo.role = "user";
-
-            console.log("userInfo ", userInfo);
+            userInfo.role = "user"; // first register/login e shbai user e thakbe.
 
             const query = { email: userInfo?.email };
 
@@ -268,23 +301,34 @@ async function mainProcess() {
             }
         });
 
-        // Make admin api
-        app.patch("/user/makeadmin/:targetEmail", async (req, res) => {
-            const targetEmail = req.params.targetEmail;
-            const query = { email: targetEmail };
-            const updateInformation = {
-                $set: {
-                    role: "admin",
-                },
-            };
-            const updateResult = await users.updateOne(query, updateInformation);
-            res.send(updateResult);
-        });
+        // Admin request
+        // Make ADMIN api
+        // Admin Verification required
+        app.patch(
+            "/user/makeadmin",
+            verifyToken,
+            requestValidate,
+            verifyAdmin,
+            async (req, res) => {
+                const targetedUserEmail = req.query.targetedUserEmail;
+                const query = { email: targetedUserEmail };
+                const updateInformation = {
+                    $set: {
+                        role: "admin",
+                    },
+                };
+                const updateResult = await users.updateOne(query, updateInformation);
+                console.log(updateResult);
+                res.send(updateResult);
+            }
+        );
 
-        // user delete
-        app.delete("/userdelete/:targetEmail", async (req, res) => {
-            const targetEmail = req.params.targetEmail;
-            const query = { email: targetEmail };
+        // Admin request
+        // user DELETE
+        // Admin Verification required
+        app.delete("/userdelete", verifyToken, requestValidate, verifyAdmin, async (req, res) => {
+            const targetedUserEmail = req.query.targetedUserEmail;
+            const query = { email: targetedUserEmail };
             const deleteResult = await users.deleteOne(query);
             res.send(deleteResult);
         });
