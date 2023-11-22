@@ -174,6 +174,7 @@ async function mainProcess() {
         const wishlist = client.db("a11-technest").collection("wishlist");
         const comments = client.db("a11-technest").collection("comments");
         const categoryNames = client.db("a11-technest").collection("category-names");
+        const users = client.db("a11-technest").collection("users");
 
         // Authenticating
         app.post("/authenticate", async (req, res) => {
@@ -221,6 +222,71 @@ async function mainProcess() {
             });
 
             res.send({ success: true });
+        });
+
+        // return all users
+        app.get("/allUsers", async (req, res) => {
+            const query = {};
+
+            const allUsers = await users.find(query).toArray();
+
+            console.log(allUsers);
+            res.send(allUsers);
+        });
+
+        // Users insertion
+        app.post("/user", async (req, res) => {
+            const userInfo = req.body?.userInfo;
+            userInfo.role = "user";
+
+            console.log("userInfo ", userInfo);
+
+            const query = { email: userInfo?.email };
+
+            const userExistence = await users.findOne(query);
+
+            if (!userExistence) {
+                // insert the user
+                const insertResult = await users.insertOne(userInfo);
+
+                if (insertResult.acknowledged) {
+                    userInfo.newUser = true;
+                    userInfo.insertion = true;
+
+                    return res.send(userInfo);
+                } else {
+                    userInfo.newUser = false;
+                    userInfo.insertion = false;
+
+                    return res.send(userInfo);
+                }
+            } else {
+                userInfo.newUser = false;
+                userInfo.insertion = false;
+
+                return res.send(userInfo);
+            }
+        });
+
+        // Make admin api
+        app.patch("/user/makeadmin/:targetEmail", async (req, res) => {
+            const targetEmail = req.params.targetEmail;
+            const query = { email: targetEmail };
+            const updateInformation = {
+                $set: {
+                    role: "admin",
+                },
+            };
+            const updateResult = await users.updateOne(query, updateInformation);
+            res.send(updateResult);
+        });
+
+        // user delete
+        app.delete("/userdelete/:targetEmail", async (req, res) => {
+            const targetEmail = req.params.targetEmail;
+            const query = { email: targetEmail };
+            const deleteResult = await users.deleteOne(query);
+            res.send(deleteResult);
         });
 
         // all blog Data Fetch
@@ -308,81 +374,6 @@ async function mainProcess() {
                 }
             } else {
                 return res.send({ searchedBlogs, allBlogs: allBlogsList });
-            }
-        });
-
-        // search blogs by title and category
-        // open api
-        app.get("/filterblogs", validateAndWishlistData, async (req, res) => {
-            console.log(req.query);
-            return;
-            const searchTitle = req.query.searchTitle;
-
-            let searchCategories = req.query.categories;
-            let sort_Date = req.query.sort_Date;
-            let sortTimeOrder = -1;
-
-            if (sort_Date === "descending") {
-                sortTimeOrder = -1;
-            } else if (sort_Date === "ascending") {
-                sortTimeOrder = 1;
-            }
-
-            let query = {};
-            const options = {
-                sort: {
-                    creationTime: sortTimeOrder,
-                },
-            };
-
-            if (searchTitle) {
-                query.title = { $regex: searchTitle, $options: "i" };
-            }
-
-            if (searchCategories) {
-                query.category = { $in: searchCategories.split(",") };
-            }
-
-            console.log(req.query);
-            console.log(query);
-
-            const allBlogsList = await allBlogs.find(query, options).toArray();
-
-            // if user logged in there must be a token and it has been verified previously
-            // But if the user is not logged in, there will be no token and no data in req.user
-            // so the user id will be available in req.user and its simple to fetch wishlist data using that user id.
-            if (req.user) {
-                const userId = req.user.userId;
-                const wishlistQuery = { userId: userId };
-                const wishListData = await wishlist.findOne(wishlistQuery);
-
-                // No wishlist data available for that user, thats why its null
-                if (!wishListData) {
-                    return res.send(allBlogsList);
-                } else {
-                    const wishLists = wishListData.wishLists;
-
-                    // Now wishlists data will merge with the blogs data
-                    let updatedAllBlogsList = [];
-
-                    allBlogsList.forEach((blogData) => {
-                        wishLists.forEach((wishlistBlogId) => {
-                            if (blogData._id.equals(wishlistBlogId)) {
-                                blogData.wishlist = true;
-                            }
-                        });
-
-                        if (!blogData.wishlist) {
-                            blogData.wishlist = false;
-                        }
-
-                        updatedAllBlogsList.push(blogData);
-                    });
-
-                    return res.send(updatedAllBlogsList);
-                }
-            } else {
-                return res.send(allBlogsList);
             }
         });
 
