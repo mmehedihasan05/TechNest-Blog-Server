@@ -362,12 +362,10 @@ async function mainProcess() {
             // Search Data Collecting
             const searchTitle = req.query.searchTitle;
             let searchCategories = req.query.categories;
-            let sort_Date = req.query.sort_Date;
+            let sort_Date = req.query.sort_Date || "descending";
 
             const sortTimeOrder =
                 sort_Date === "descending" ? -1 : sort_Date === "ascending" ? 1 : -1;
-
-            console.log(req.query);
 
             let allBlogsList = [];
             let searchedBlogs = true;
@@ -411,7 +409,8 @@ async function mainProcess() {
                 // No wishlist data available for that user, thats why its null
                 if (!wishListData) {
                     // console.log("No wishlist data available");
-                    return res.send(allBlogsList);
+                    return res.send({ searchedBlogs, allBlogs: allBlogsList });
+                    // return res.send(allBlogsList);
                 } else {
                     const wishLists = wishListData.wishLists;
                     // console.log("wishLists", wishLists);
